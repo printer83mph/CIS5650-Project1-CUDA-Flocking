@@ -53,7 +53,7 @@ find_package(CCCL REQUIRED)
 set(headers
     src/cudaMat4.hpp
     src/glslUtility.hpp
-    src/kernel.h
+    src/kernel.cuh
     src/main.hpp
     src/utilityCore.hpp
     )
