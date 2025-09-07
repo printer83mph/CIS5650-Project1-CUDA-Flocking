@@ -247,10 +247,17 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf,
                                            const glm::vec3 *pos,
                                            const glm::vec3 *vel) {
   // Rule 1: boids fly towards their local perceived center of mass, which
-  // excludes themselves Rule 2: boids try to stay a distance d away from each
-  // other Rule 3: boids try to match the speed of surrounding boids
+  // excludes themselves
+  // Rule 2: boids try to stay a distance d away from each other
+  // Rule 3: boids try to match the speed of surrounding boids
   return glm::vec3(0.0f, 0.0f, 0.0f);
 }
+
+/**
+ * Quick utility for getting the square of a number at compile time.
+ * Used for magnitude calculations.
+ */
+__device__ constexpr float square(float n) { return n * n; }
 
 /**
  * TODO-1.2 implement basic flocking
@@ -260,8 +267,21 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf,
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
                                              glm::vec3 *vel1, glm::vec3 *vel2) {
   // Compute a new velocity based on pos and vel1
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+  glm::vec3 thisVel = vel1[index];
+  glm::vec3 newVel = thisVel + computeVelocityChange(N, index, pos, vel1);
+
   // Clamp the speed
+  float speedSquared = glm::dot(newVel, newVel);
+  if (speedSquared > square(maxSpeed)) {
+    newVel = newVel * maxSpeed / sqrt(speedSquared);
+  }
+
   // Record the new velocity into vel2. Question: why NOT vel1?
+  vel2[index] = newVel;
 }
 
 /**
