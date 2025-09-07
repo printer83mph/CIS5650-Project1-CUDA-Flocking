@@ -434,19 +434,70 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   }
 }
 
+// Update a boid's velocity using the uniform grid to reduce
+// the number of boids that need to be checked.
 __global__ void kernUpdateVelNeighborSearchScattered(
     int N, int gridResolution, glm::vec3 gridMin, float inverseCellWidth,
     float cellWidth, int *gridCellStartIndices, int *gridCellEndIndices,
     int *particleArrayIndices, glm::vec3 *pos, glm::vec3 *vel1,
     glm::vec3 *vel2) {
-  // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
-  // the number of boids that need to be checked.
-  // - Identify the grid cell that this particle is in
-  // - Identify which cells may contain neighbors. This isn't always 8.
-  // - For each cell, read the start/end indices in the boid pointer array.
-  // - Access each boid in the cell and compute velocity change from
-  //   the boids rules, if this boid is within the neighborhood distance.
-  // - Clamp the speed change before putting the new speed in vel2
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+  if (index >= N) {
+    return;
+  }
+
+  // This gets added to by all goobers
+  glm::vec3 totalAddedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+
+  glm::vec3 posSelf = pos[index];
+  glm::vec3 velSelf = vel1[index];
+
+  // Identify the grid cell that this particle is in
+  glm::ivec3 selfGridCellPos = glm::floor(posSelf / cellWidth) - gridMin;
+  int selfGridCell = gridIndex3Dto1D(selfGridCellPos.x, selfGridCellPos.y,
+                                     selfGridCellPos.z, gridResolution);
+
+  // Identify which cells may contain neighbors. This isn't always 8. Here, we
+  // check all 27 neighboring cells (including self).
+  for (int dz = -1; dz <= 1; dz++) {
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        glm::ivec3 neighborCellPos = selfGridCellPos + glm::ivec3(dx, dy, dz);
+
+        // Skip iteration if outside bounds
+        if (neighborCellPos.x < 0 || neighborCellPos.x >= gridResolution ||
+            neighborCellPos.y < 0 || neighborCellPos.y >= gridResolution ||
+            neighborCellPos.z < 0 || neighborCellPos.z >= gridResolution) {
+          continue;
+        }
+
+        int neighborGridCell =
+            gridIndex3Dto1D(neighborCellPos.x, neighborCellPos.y,
+                            neighborCellPos.z, gridResolution);
+
+        // Get boid start/end indices for this cell
+        int startIdx = gridCellStartIndices[neighborGridCell];
+        int endIdx = gridCellEndIndices[neighborGridCell];
+        int relativeSelfIndex = index - startIdx;
+
+        // Use smaller views of the pos and vel arrays to reuse logic
+        totalAddedVelocity +=
+            computeVelocityChange(endIdx - startIdx, relativeSelfIndex,
+                                  pos + startIdx, vel1 + startIdx);
+      }
+    }
+  }
+
+  glm::vec3 velNew = velSelf + computeVelocityChange(N, index, pos, vel1);
+
+  // Clamp the speed
+  float newSpeedSquared = glm::dot(velNew, velNew);
+  if (newSpeedSquared > square(maxSpeed)) {
+    velNew = velNew / sqrt(newSpeedSquared) * maxSpeed;
+  }
+
+  // Record the new velocity into vel2
+  vel2[index] = velNew;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
