@@ -1,6 +1,6 @@
 #define GLM_FORCE_CUDA
 
-#include "kernel.h"
+#include "kernel.cuh"
 #include <cuda.h>
 
 #include <cstdio>

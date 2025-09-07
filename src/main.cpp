@@ -7,7 +7,7 @@
  */
 
 #include "main.hpp"
-#include "kernel.h"
+#include "kernel.cuh"
 
 #include <iostream>
 #include <memory>
