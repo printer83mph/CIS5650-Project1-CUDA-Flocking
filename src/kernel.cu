@@ -453,16 +453,24 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   glm::vec3 velSelf = vel1[index];
 
   // Identify the grid cell that this particle is in
-  glm::ivec3 selfGridCellPos = glm::floor(posSelf / cellWidth) - gridMin;
+  glm::ivec3 selfGridCellPos = glm::floor(posSelf * inverseCellWidth) - gridMin;
   int selfGridCell = gridIndex3Dto1D(selfGridCellPos.x, selfGridCellPos.y,
                                      selfGridCellPos.z, gridResolution);
 
-  // Identify which cells may contain neighbors. This isn't always 8. Here, we
-  // check all 27 neighboring cells (including self).
-  for (int dz = -1; dz <= 1; dz++) {
-    for (int dy = -1; dy <= 1; dy++) {
-      for (int dx = -1; dx <= 1; dx++) {
-        glm::ivec3 neighborCellPos = selfGridCellPos + glm::ivec3(dx, dy, dz);
+  // Identify which cells may contain neighbors. This isn't always 8. Let's set
+  // the bounds based on our particle's position and the neighbor search radius.
+
+  float neighborMaxRadius =
+      imax(imax(rule1Distance, rule2Distance), rule3Distance);
+  glm::vec3 searchBounds = glm::vec3(neighborMaxRadius);
+  glm::ivec3 searchMin = glm::floor(posSelf - searchBounds);
+  glm::ivec3 searchMaxInclusive = glm::floor(posSelf + searchBounds);
+
+  // Iterate through all possibly influential cells
+  for (int z = searchMin.z; z <= searchMaxInclusive.z; z++) {
+    for (int y = searchMin.y; y <= searchMaxInclusive.y; y++) {
+      for (int x = searchMin.x; x <= searchMaxInclusive.x; x++) {
+        glm::ivec3 neighborCellPos = glm::ivec3(x, y, z);
 
         // Skip iteration if outside bounds
         if (neighborCellPos.x < 0 || neighborCellPos.x >= gridResolution ||
@@ -488,7 +496,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     }
   }
 
-  glm::vec3 velNew = velSelf + computeVelocityChange(N, index, pos, vel1);
+  glm::vec3 velNew = velSelf + totalAddedVelocity;
 
   // Clamp the speed
   float newSpeedSquared = glm::dot(velNew, velNew);
