@@ -375,6 +375,12 @@ __device__ int gridIndex3Dto1D(int x, int y, int z, int gridResolution) {
   return x + y * gridResolution + z * gridResolution * gridResolution;
 }
 
+__device__ glm::ivec3 gridIndex1Dto3D(int index, int gridResolution) {
+  return glm::ivec3(index % gridResolution,
+                    (index / gridResolution) % gridResolution,
+                    (index / (gridResolution * gridResolution)));
+}
+
 __global__ void kernComputeIndices(int N, int gridResolution, glm::vec3 gridMin,
                                    float inverseCellWidth, glm::vec3 *pos,
                                    int *indices, int *gridIndices) {
