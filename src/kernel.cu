@@ -378,10 +378,17 @@ __device__ int gridIndex3Dto1D(int x, int y, int z, int gridResolution) {
 __global__ void kernComputeIndices(int N, int gridResolution, glm::vec3 gridMin,
                                    float inverseCellWidth, glm::vec3 *pos,
                                    int *indices, int *gridIndices) {
-  // TODO-2.1
-  // - Label each boid with the index of its grid cell.
-  // - Set up a parallel array of integer indices as pointers to the actual
-  //   boid data in pos and vel1/vel2
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+  if (index >= N)
+    return;
+
+  glm::vec3 posSelf = pos[index];
+
+  glm::vec3 gridPos = glm::floor(posSelf / (float)gridResolution) - gridMin;
+
+  indices[index] = index;
+  gridIndices[index] =
+      gridIndex3Dto1D(gridPos.x, gridPos.y, gridPos.z, gridResolution);
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
