@@ -368,6 +368,9 @@ __global__ void kernUpdatePos(int N, float dt, glm::vec3 *pos, glm::vec3 *vel) {
 //          for(x)
 //            for(y)
 //             for(z)? Or some other order?
+//
+// Note to self - match largest factors with outermost for loops, such that
+// the iteration goes through indices contiguously
 __device__ int gridIndex3Dto1D(int x, int y, int z, int gridResolution) {
   return x + y * gridResolution + z * gridResolution * gridResolution;
 }
