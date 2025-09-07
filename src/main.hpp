@@ -2,8 +2,10 @@
 
 #include "glslUtility.hpp"
 #include "utilityCore.hpp"
-#include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
+// NOLINTBEGIN(misc-definitions-in-headers)
 
 //====================================
 // GL Stuff
@@ -11,7 +13,7 @@
 
 GLuint positionLocation = 0;   // Match results from glslUtility::createProgram.
 GLuint velocitiesLocation = 1; // Also see attribtueLocations below.
-const char *attributeLocations[] = { "Position", "Velocity" };
+const char *attributeLocations[] = {"Position", "Velocity"};
 
 GLuint boidVAO = 0;
 GLuint boidVBO_positions = 0;
@@ -22,7 +24,7 @@ GLuint program[2];
 
 const unsigned int PROG_BOID = 0;
 
-const float fovy = (float) (PI / 4);
+const float fovy = (float)(PI / 4);
 const float zNear = 0.10f;
 const float zFar = 10.0f;
 // LOOK-1.2: for high DPI displays, you may want to double these settings.
@@ -49,16 +51,17 @@ glm::mat4 projection;
 
 const char *projectName;
 
-int main(int argc, char* argv[]);
+int main(int argc, char *argv[]);
 
 //====================================
 // Main loop
 //====================================
 void mainLoop();
 void errorCallback(int error, const char *description);
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
+void keyCallback(GLFWwindow *window, int key, int scancode, int action,
+                 int mods);
+void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
+void mousePositionCallback(GLFWwindow *window, double xpos, double ypos);
 void updateCamera();
 void runCUDA();
 
@@ -68,3 +71,5 @@ void runCUDA();
 bool init(int argc, char **argv);
 void initVAO();
 void initShaders(GLuint *program);
+
+// NOLINTEND(misc-definitions-in-headers)
