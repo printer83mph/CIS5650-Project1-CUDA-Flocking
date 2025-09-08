@@ -565,18 +565,116 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     int N, int gridResolution, glm::vec3 gridMin, float inverseCellWidth,
     float cellWidth, int *gridCellStartIndices, int *gridCellEndIndices,
     glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
-  // TODO-2.3 - This should be very similar to
-  // kernUpdateVelNeighborSearchScattered, except with one less level of
-  // indirection. This should expect gridCellStartIndices and gridCellEndIndices
-  // to refer directly to pos and vel1.
-  // - Identify the grid cell that this particle is in
-  // - Identify which cells may contain neighbors. This isn't always 8.
-  // - For each cell, read the start/end indices in the boid pointer array.
-  //   DIFFERENCE: For best results, consider what order the cells should be
-  //   checked in to maximize the memory benefits of reordering the boids data.
-  // - Access each boid in the cell and compute velocity change from
-  //   the boids rules, if this boid is within the neighborhood distance.
-  // - Clamp the speed change before putting the new speed in vel2
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+  if (index >= N) {
+    return;
+  }
+
+  // This gets added to by all goobers
+  glm::vec3 totalAddedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+
+  glm::vec3 posSelf = pos[index];
+  glm::vec3 velSelf = vel1[index];
+
+  // Identify which cells may contain neighbors. This isn't always 8. Let's set
+  // the bounds based on our particle's position and the neighbor search radius.
+
+  glm::ivec3 cellPosSelf = glm::floor((posSelf - gridMin) * inverseCellWidth);
+  float neighborMaxRadius =
+      cxpr_max(cxpr_max(rule1Distance, rule2Distance), rule3Distance);
+  glm::vec3 searchLength = glm::vec3(neighborMaxRadius);
+
+  glm::ivec3 gridSearchMin =
+      glm::floor((posSelf - gridMin - searchLength) * inverseCellWidth);
+  glm::ivec3 gridSearchMaxInclusive =
+      glm::floor((posSelf - gridMin + searchLength) * inverseCellWidth);
+
+  // Rule 1 data collection
+  glm::vec3 perceivedCenterOfMass = glm::vec3(0.0f, 0.0f, 0.0f);
+  int centerOfMassNeighbors = 0;
+  // Rule 2 data collection
+  glm::vec3 c = glm::vec3(0.0f, 0.0f, 0.0f);
+  // Rule 3 data collection
+  glm::vec3 perceivedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+  int velocityNeighbors = 0;
+
+  // Iterate through all possibly influential cells
+  // For memory efficiency, we go z->y->x (contiguous memory since our indexing
+  // is z-major then y-major inside that)
+  for (int z = gridSearchMin.z; z <= gridSearchMaxInclusive.z; z++) {
+    for (int y = gridSearchMin.y; y <= gridSearchMaxInclusive.y; y++) {
+      for (int x = gridSearchMin.x; x <= gridSearchMaxInclusive.x; x++) {
+        glm::ivec3 neighborCellPos = glm::ivec3(x, y, z);
+
+        // Skip iteration if outside bounds
+        if (neighborCellPos.x < 0 || neighborCellPos.x >= gridResolution ||
+            neighborCellPos.y < 0 || neighborCellPos.y >= gridResolution ||
+            neighborCellPos.z < 0 || neighborCellPos.z >= gridResolution) {
+          continue;
+        }
+
+        int neighborGridCell =
+            gridIndex3Dto1D(neighborCellPos.x, neighborCellPos.y,
+                            neighborCellPos.z, gridResolution);
+
+        // Get boid start/end indices for this cell
+        int startIdx = gridCellStartIndices[neighborGridCell];
+        int endIdx = gridCellEndIndices[neighborGridCell];
+
+        // Access boids directly (no indirection)
+        for (int i = startIdx; i < endIdx; ++i) {
+          if (i == index)
+            continue;
+
+          glm::vec3 posI = pos[i];
+          glm::vec3 distance = posI - posSelf;
+          float distanceSq = glm::dot(distance, distance);
+
+          // Rule 1: boids fly towards their local perceived center of mass,
+          // which excludes themselves
+          if (distanceSq < square(rule1Distance)) {
+            centerOfMassNeighbors++;
+            perceivedCenterOfMass += posI;
+          }
+          // Rule 2: boids try to stay a distance d away from each other
+          if (distanceSq < square(rule2Distance)) {
+            c -= distance;
+          }
+          // Rule 3: boids try to match the speed of surrounding boids
+          if (distanceSq < square(rule3Distance)) {
+            velocityNeighbors++;
+            perceivedVelocity += vel1[i];
+          }
+        }
+      }
+    }
+  }
+
+  // Apply rule 1 to overall velocity addition
+  if (centerOfMassNeighbors > 0) {
+    perceivedCenterOfMass /= centerOfMassNeighbors;
+    totalAddedVelocity += (perceivedCenterOfMass - posSelf) * rule1Scale;
+  }
+
+  // Apply rule 2 to overall velocity addition
+  totalAddedVelocity += c * rule2Scale;
+
+  // Apply rule 3 to overall velocity addition
+  if (velocityNeighbors > 0) {
+    perceivedVelocity /= velocityNeighbors;
+    totalAddedVelocity += perceivedVelocity * rule3Scale;
+  }
+
+  glm::vec3 velNew = velSelf + totalAddedVelocity;
+
+  // Clamp the speed
+  float newSpeedSquared = glm::dot(velNew, velNew);
+  if (newSpeedSquared > square(maxSpeed)) {
+    velNew = velNew / sqrt(newSpeedSquared) * maxSpeed;
+  }
+
+  // Record the new velocity into vel2
+  vel2[index] = velNew;
 }
 
 /**
