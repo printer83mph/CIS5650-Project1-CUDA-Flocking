@@ -19,6 +19,8 @@ When increasing boid count with our naive method (left), we get a clearly expone
 
 When changing block size, we can see a correlation between block size and kernel timing in the naive method (far left). In the uniform methods, both scattered and contiguous, there is no clear relation between block size and compute time, with numbers appearing flat throughout. This makes sense, seeing as the naive method simply gets limited by less and less warps being available, with each one taken up by some long, long raw computation and not I/O.
 
+Full data for these charts can be found in this [Google Sheets](https://docs.google.com/spreadsheets/d/1Y02QKcO3Mqwjt8nWyBKV0KpgBx1f-lHaxcIr9DEqbnA/edit?usp=sharing).
+
 ## Extra Credit
 
 - Grid-Looping Optimization
